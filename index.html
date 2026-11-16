@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiDAR V2X Cooperative Localization Pipeline · ESTACA × VEDECOM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syncopate:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-deep:#04070a; --bg-panel:#0a0f14; --bg-panel-2:#10161d; --bg-elevated:#161d26;
+  --border:#1f2833; --border-soft:#161d26;
+  --text-primary:#e8eef5; --text-secondary:#8a96a6; --text-muted:#4d5968;
+  --accent:#00d4ff; --accent-2:#00ff9d; --accent-glow:rgba(0,212,255,.4);
+  --car:#22c55e; --cyclist:#ef4444; --ped:#facc15;
+  --m-L:#22d3ee;
+  --gps:#4a9eff; --fl2:#94a3b8; --gt:#f8fafc;
+  --sm-X:#38bdf8; --sm-I:#34d399; --sm-V:#fbbf24; --sm-z:#64748b;
+  --mono:'JetBrains Mono',monospace; --disp:'Syncopate',sans-serif; --sans:'Space Grotesk',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg-deep);color:var(--text-primary);font-family:var(--sans);overflow:hidden}
+button{font:inherit;color:inherit}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#1f2833;border-radius:3px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* LANDING */
+.landing{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;overflow:hidden;
+  background:linear-gradient(135deg,rgba(4,7,10,.9) 0%,rgba(4,7,10,.78) 50%,rgba(4,7,10,.94) 100%),url('background.jpg') center/cover no-repeat;
+  transition:opacity .6s ease,transform .6s ease}
+.landing.hidden{opacity:0;pointer-events:none;transform:scale(1.02)}
+#bg-net{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:.75}
+.landing::after{content:'';position:absolute;left:0;right:0;top:0;height:2px;z-index:2;opacity:.5;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 5s linear infinite}
+@keyframes scanline{to{transform:translateY(100vh)}}
+.landing-top{padding:24px 48px;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:3;
+  border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(6px)}
+.logo-group{display:flex;align-items:center;gap:18px}
+.hex-logo{width:36px;height:36px;position:relative;animation:spin 20s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hex-logo::before,.hex-logo::after,.brand-logo::before,.brand-logo::after{content:'';position:absolute;inset:0;border:1.5px solid var(--accent);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
+.hex-logo::after,.brand-logo::after{inset:6px;opacity:.5;transform:rotate(30deg)}
+.logo-text h1{font-family:var(--disp);font-size:12px;font-weight:700;letter-spacing:.3em;text-transform:uppercase}
+.logo-text p{font-family:var(--mono);font-size:9px;color:var(--text-secondary);letter-spacing:.25em;text-transform:uppercase;margin-top:2px}
+.status-stripe{display:flex;gap:28px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--text-secondary);text-transform:uppercase}
+.status-stripe div{display:flex;align-items:center;gap:8px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 8px var(--accent-2);animation:pulse 2s infinite}
+.landing-main{flex:1;display:grid;grid-template-columns:1.15fr .85fr;align-items:center;padding:0 48px;gap:56px;position:relative;z-index:3;min-height:0;overflow:auto}
+.landing-left{display:flex;flex-direction:column;gap:24px;animation:inL .8s ease-out}
+@keyframes inL{from{opacity:0;transform:translateX(-30px)}}
+.tag-line{display:inline-flex;align-items:center;gap:10px;padding:7px 14px;width:fit-content;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.3);
+  border-radius:2px;font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.2em;text-transform:uppercase}
+.tag-line::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent)}
+.landing-title{font-family:var(--disp);font-size:clamp(34px,4.6vw,64px);font-weight:700;line-height:1.02;letter-spacing:-.02em;text-transform:uppercase}
+.landing-title .t2{display:block;background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.landing-title .t3{display:block;margin-top:14px;color:var(--text-secondary);font-family:var(--sans);font-size:.27em;font-weight:500;letter-spacing:.22em}
+.landing-subtitle{font-size:14px;color:var(--text-secondary);line-height:1.75;max-width:620px}
+.landing-subtitle strong{color:var(--text-primary);font-weight:500}
+.kw{display:flex;flex-wrap:wrap;gap:8px;max-width:640px}
+.kw span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--border);
+  background:rgba(10,15,20,.6);color:var(--text-secondary);border-radius:2px}
+.kw span b{color:var(--accent);font-weight:500}
+.pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:0;max-width:680px;border:1px solid rgba(255,255,255,.08);background:rgba(10,15,20,.55);backdrop-filter:blur(8px)}
+.pipe>div{padding:12px 14px;position:relative;border-right:1px solid rgba(255,255,255,.06)}
+.pipe>div:last-child{border-right:none}
+.pipe>div::after{content:'▸';position:absolute;right:-6px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:11px;z-index:2}
+.pipe>div:last-child::after{display:none}
+.pipe .n{font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:.2em}
+.pipe .h{font-size:12px;font-weight:600;margin:4px 0 3px}
+.pipe .d{font-size:10.5px;color:var(--text-secondary);line-height:1.45}
+.author-block{display:flex;gap:24px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}
+.author-info{display:flex;flex-direction:column;gap:4px}
+.author-label{font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:.2em;text-transform:uppercase}
+.author-name{font-size:15px;font-weight:500}
+.author-role{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.1em}
+.author-sep{width:1px;background:rgba(255,255,255,.1)}
+.landing-right{animation:inR .9s ease-out}
+@keyframes inR{from{opacity:0;transform:translateX(30px)}}
+.select-panel{background:linear-gradient(135deg,rgba(10,15,20,.88),rgba(16,22,29,.88));border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(24px) saturate(160%);
+  padding:32px;border-radius:4px;position:relative;box-shadow:0 24px 48px rgba(0,0,0,.5),0 0 0 1px rgba(0,212,255,.1)}
+.select-panel::before{content:'';position:absolute;left:0;top:0;width:60%;height:2px;background:linear-gradient(90deg,var(--accent),transparent)}
+.select-panel::after{content:'';position:absolute;right:0;bottom:0;width:40%;height:2px;background:linear-gradient(90deg,transparent,var(--accent-2))}
+.select-panel h3{font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:.25em;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+.select-panel h3::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+.step{margin-bottom:20px}
+.step-label{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--bg-deep);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text-muted);transition:.3s}
+.step.active .step-num{background:var(--accent);color:var(--bg-deep);border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+.step.done .step-num{background:var(--accent-2);color:var(--bg-deep);border-color:var(--accent-2)}
+.step-title{font-size:11px;font-weight:500;color:var(--text-secondary);letter-spacing:.1em;text-transform:uppercase}
+.step.active .step-title{color:var(--text-primary)}
+.chip-group{display:flex;gap:8px;flex-wrap:wrap}
+.noise-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chip{flex:1;min-width:80px;padding:12px 14px;background:var(--bg-deep);border:1px solid var(--border);border-radius:3px;cursor:pointer;transition:.2s;
+  text-align:center;user-select:none;font-family:var(--mono);font-size:11px;color:var(--text-secondary);position:relative}
+.chip.disabled{opacity:.3;cursor:not-allowed}
+.chip:not(.disabled):hover{border-color:var(--accent);color:var(--text-primary)}
+.chip.selected{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg-deep));box-shadow:0 0 0 1px var(--accent),0 0 16px var(--accent-glow)}
+.chip-big{padding:16px 12px;font-size:13px;font-weight:700;font-family:var(--disp);letter-spacing:.12em}
+.chip-badge{display:block;font-size:9px;font-family:var(--mono);color:var(--text-muted);margin-top:5px;letter-spacing:.08em;font-weight:400}
+.chip.selected .chip-badge{color:var(--accent);opacity:.85}
+.noise-chip{text-align:left;padding:12px 14px}
+.noise-chip .nc-k{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--text-muted)}
+.noise-chip .nc-v{font-family:var(--disp);font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--text-primary);margin:3px 0 7px}
+.noise-chip .nc-b{font-family:var(--mono);font-size:10.5px;color:var(--text-secondary)}
+.noise-chip .nc-id{position:absolute;top:10px;right:12px;font-family:var(--mono);font-size:9px;color:var(--text-muted)}
+.noise-chip.selected .nc-v,.noise-chip.selected .nc-b{color:var(--accent)}
+.seq-select{width:100%;padding:12px 38px 12px 14px;background:var(--bg-deep);border:1px solid var(--border);color:var(--text-primary);font-family:var(--mono);font-size:11px;
+  border-radius:3px;cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12'><path d='M3 5l3 3 3-3' stroke='%2300d4ff' stroke-width='1.5' fill='none'/></svg>");
+  background-repeat:no-repeat;background-position:right 14px center}
+.seq-select:disabled{opacity:.3;cursor:not-allowed}
+.seq-select option{background:var(--bg-panel-2)}
+.launch-btn{width:100%;margin-top:6px;padding:16px;border:none;cursor:pointer;border-radius:3px;transition:.3s;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--bg-deep);font-family:var(--disp);font-size:13px;font-weight:700;letter-spacing:.25em;
+  text-transform:uppercase;box-shadow:0 8px 24px rgba(0,212,255,.3)}
+.launch-btn:disabled{background:var(--bg-elevated);color:var(--text-muted);cursor:not-allowed;box-shadow:none}
+.launch-btn:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,212,255,.5)}
+.landing-bottom{padding:16px 48px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:center;position:relative;z-index:3;
+  font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:.25em;text-transform:uppercase}
+.landing-bottom .corners{display:flex;gap:18px}
+
+.loading-overlay{position:fixed;inset:0;z-index:200;background:var(--bg-deep);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px;
+  opacity:0;pointer-events:none;transition:opacity .3s}
+.loading-overlay.show{opacity:1;pointer-events:all}
+.loader-hex{width:60px;height:60px;position:relative}
+.loader-hex div{position:absolute;inset:0;border:2px solid var(--accent);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:lp 1.5s ease-in-out infinite}
+.loader-hex div:nth-child(2){animation-delay:.3s;opacity:.6}.loader-hex div:nth-child(3){animation-delay:.6s;opacity:.3}
+@keyframes lp{50%{transform:scale(1.1);opacity:.3}}
+.loading-text{font-family:var(--mono);font-size:11px;color:var(--text-secondary);letter-spacing:.3em;text-transform:uppercase}
+.error-banner{position:fixed;top:16px;left:50%;transform:translate(-50%,-200%);visibility:hidden;z-index:300;background:#2a0f14;border:1px solid #ef4444;color:#fecaca;
+  padding:12px 40px 12px 16px;font-family:var(--mono);font-size:11px;border-radius:3px;transition:.3s;max-width:90vw}
+.error-banner.show{transform:translate(-50%,0);visibility:visible}
+.error-banner .close{position:absolute;right:10px;top:8px;background:none;border:none;cursor:pointer;font-size:16px}
+
+/* DASHBOARD */
+.app{display:grid;grid-template-columns:340px 1fr 330px;grid-template-rows:56px 1fr auto;height:100vh;position:relative;z-index:1;
+  opacity:0;pointer-events:none;transition:opacity .6s .2s}
+.app.visible{opacity:1;pointer-events:all}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at 15% 0%,rgba(0,212,255,.045),transparent 50%),radial-gradient(ellipse at 85% 100%,rgba(34,211,238,.03),transparent 50%)}
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--border);background:var(--bg-panel);gap:16px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-logo{width:26px;height:26px;position:relative;flex:none}
+.brand-text h1{font-family:var(--disp);font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap}
+.brand-text p{font-family:var(--mono);font-size:8.5px;color:var(--text-secondary);letter-spacing:.2em;text-transform:uppercase}
+.hstat{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10.5px;color:var(--text-secondary);min-width:0;flex-wrap:nowrap;overflow:hidden}
+.hbadge{display:flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid var(--border);border-radius:2px;background:var(--bg-deep);white-space:nowrap}
+.hbadge .k{font-size:8.5px;letter-spacing:.2em;color:var(--text-muted)}
+.hbadge .v{color:var(--text-primary);font-weight:500}
+.hbadge.gnss{border-color:rgba(74,158,255,.35)}.hbadge.gnss .v{color:#9cc8ff}
+.hbadge.bbox{border-color:rgba(0,212,255,.35)}.hbadge.bbox .v{color:var(--accent)}
+.hbadge.demo{border-color:#ef4444;color:#fca5a5;animation:pulse 2s infinite;display:none}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 8px var(--accent-2);animation:pulse 2s infinite}
+.btn{background:transparent;border:1px solid var(--border);color:var(--text-secondary);padding:6px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;cursor:pointer;border-radius:2px;transition:.2s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.on{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.08)}
+
+aside{background:var(--bg-panel);overflow-y:auto;min-height:0}
+.left-panel{border-right:1px solid var(--border)}
+.right-panel{border-left:1px solid var(--border)}
+.section{padding:16px 16px 14px;border-bottom:1px solid var(--border-soft)}
+.section-title{font-family:var(--mono);font-size:9.5px;color:var(--text-muted);letter-spacing:.22em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+.section-title .aux{flex:none;order:2;color:var(--text-muted);letter-spacing:.1em}
+
+.mrow{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:10px;padding:8px 10px;margin-bottom:5px;border:1px solid var(--border);border-radius:3px;
+  cursor:pointer;background:var(--bg-deep);transition:.18s;position:relative;overflow:hidden}
+.mrow::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c);opacity:0;transition:.2s}
+.mrow.on{border-color:color-mix(in srgb,var(--c) 45%,var(--border));background:linear-gradient(90deg,color-mix(in srgb,var(--c) 9%,transparent),transparent 70%)}
+.mrow.on::before{opacity:1;box-shadow:0 0 10px var(--c)}
+.mrow:hover{border-color:color-mix(in srgb,var(--c) 70%,var(--border))}
+.sw{width:14px;height:3px;border-radius:2px;background:var(--c);opacity:.35}
+.mrow.on .sw{opacity:1;box-shadow:0 0 6px var(--c)}
+.mname{font-size:12px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.mname small{font-family:var(--mono);font-size:8.5px;color:var(--text-muted);font-weight:400;margin-left:6px;letter-spacing:.1em}
+.mval{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);text-align:right;white-space:nowrap}
+.mrow.on .mval{color:var(--c)}
+.mrow.na{opacity:.35;cursor:not-allowed}
+
+/* LiDAR × communication cards */
+.scen-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{border:1px solid var(--border);background:var(--bg-deep);border-radius:3px;padding:10px 6px 8px;cursor:pointer;text-align:center;position:relative;transition:.18s;user-select:none}
+.cell .sc{font-family:var(--disp);font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--text-secondary)}
+.cell .sd{font-family:var(--mono);font-size:7.5px;color:var(--text-muted);letter-spacing:.06em;margin:3px 0 7px}
+.cell .v{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.4}
+.cell .v i{font-style:normal;font-size:7.5px;color:var(--text-muted);margin-right:3px;letter-spacing:.05em}
+.cell .ln{height:3px;margin:0 auto 7px;width:70%;border-radius:2px;opacity:.3}
+.cell.on{border-color:color-mix(in srgb,var(--c) 60%,var(--border));background:color-mix(in srgb,var(--c) 10%,var(--bg-deep))}
+.cell.on .v,.cell.on .sc{color:var(--text-primary)}
+.cell.on .ln{opacity:1}
+.cell.focus{box-shadow:0 0 0 1px var(--c),0 0 14px color-mix(in srgb,var(--c) 45%,transparent)}
+.cell.focus::before{content:'◉';position:absolute;top:2px;left:5px;font-size:8px;color:var(--c)}
+.cell.na{opacity:.3;cursor:not-allowed}
+.all-btn{width:100%;margin-top:10px;padding:9px;font-size:10px}
+.pick-hint{margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:.06em;text-align:center}
+.hint{font-size:10px;color:var(--text-muted);line-height:1.5;margin-top:9px;font-family:var(--mono)}
+
+.tg{display:flex;align-items:center;justify-content:space-between;padding:7px 2px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none}
+.tg:hover{color:var(--text-primary)}
+.sw2{width:28px;height:15px;border-radius:8px;background:var(--bg-elevated);border:1px solid var(--border);position:relative;transition:.2s;flex:none}
+.sw2::after{content:'';position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:var(--text-muted);transition:.2s}
+.tg.on .sw2{background:rgba(0,212,255,.2);border-color:var(--accent)}
+.tg.on .sw2::after{left:15px;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.lgd{display:flex;flex-direction:column;gap:6px}
+.lgh{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-muted);margin-top:8px}
+.lgh:first-child{margin-top:0}
+.lr{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-secondary);flex-wrap:wrap}
+.lr svg{width:26px;height:14px;flex:none}
+.lr .cc{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.lr .cc + span{margin-right:6px}
+
+.canvas-area{display:grid;grid-template-rows:1fr 1fr;min-height:0;min-width:0;position:relative}
+.cw{position:relative;min-height:0;border-bottom:1px solid var(--border);overflow:hidden}
+.cw:last-child{border-bottom:none}
+.cw canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+.cw canvas:active{cursor:grabbing}
+.clabel{position:absolute;top:12px;left:14px;z-index:2;font-family:var(--disp);font-size:10.5px;letter-spacing:.25em;padding:6px 11px;border:1px solid var(--border);
+  background:rgba(4,7,10,.82);backdrop-filter:blur(6px);display:flex;gap:10px;align-items:center}
+.clabel .spd{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--text-secondary)}
+.cmode{position:absolute;top:12px;right:14px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.14em;padding:6px 11px;border:1px solid var(--border);
+  background:rgba(4,7,10,.82);backdrop-filter:blur(6px);color:var(--text-secondary);display:flex;align-items:center;gap:8px;text-transform:uppercase;transition:border-color .25s}
+.cmode .d{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.ccount{position:absolute;bottom:12px;left:14px;z-index:2;display:flex;gap:6px}
+.ccount span{font-family:var(--mono);font-size:10px;padding:4px 8px;background:rgba(4,7,10,.82);border:1px solid var(--border);color:var(--text-secondary);display:flex;gap:6px;align-items:center}
+.ccount span i{width:8px;height:8px;border-radius:1px;display:inline-block}
+.czoom{position:absolute;bottom:12px;right:14px;z-index:2;display:flex;gap:4px}
+.czoom button{width:26px;height:26px;background:rgba(4,7,10,.85);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-family:var(--mono);font-size:12px;border-radius:2px}
+.czoom button:hover,.czoom button.on{border-color:var(--accent);color:var(--accent)}
+
+.telem-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.telem-card{background:var(--bg-deep);border:1px solid var(--border);padding:10px 12px;border-radius:3px}
+.telem-card.wide{grid-column:1/-1}
+.telem-label{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--text-muted);text-transform:uppercase}
+.telem-value{font-family:var(--mono);font-size:19px;font-weight:500;margin-top:4px}
+.telem-unit{font-size:10px;color:var(--text-muted);margin-left:4px}
+.vtabs{display:flex;gap:4px;margin-bottom:10px}
+.vtabs .btn{flex:1;padding:5px}
+.rank{position:relative}
+.rk{position:absolute;left:0;right:0;height:30px;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .3s;display:grid;grid-template-columns:18px 1fr 58px;gap:8px;align-items:center}
+.rk .pos{font-family:var(--mono);font-size:9px;color:var(--text-muted)}
+.rk .nm{font-size:10.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;padding-bottom:6px}
+.rk .bar{position:absolute;left:0;bottom:0;height:3px;border-radius:2px;background:var(--c);box-shadow:0 0 6px var(--c);transition:width .3s}
+.rk .val{font-family:var(--mono);font-size:11px;color:var(--c);text-align:right}
+.rk.first .nm{color:var(--text-primary)}
+.rk.first .pos{color:var(--accent-2)}
+.rk.sel{background:rgba(255,255,255,.05);border-radius:2px}.rk.sel .nm{color:var(--text-primary)}
+.insp{background:var(--bg-deep);border:1px solid var(--border);border-radius:3px;padding:11px 12px;margin-bottom:8px;position:relative;overflow:hidden}
+.insp::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c,var(--border))}
+.insp-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.insp-h b{font-family:var(--disp);font-size:9.5px;letter-spacing:.2em}
+.insp-h span{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;padding:3px 7px;border-radius:2px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-family:var(--mono);font-size:10.5px}
+.kv .k{color:var(--text-muted)}
+.kv .v{color:var(--text-primary);text-align:right}
+.srcs{display:flex;gap:4px;justify-content:flex-end}
+.srcs em{font-style:normal;font-size:9px;padding:1px 5px;border:1px solid var(--border);color:var(--text-muted);border-radius:2px}
+.srcs em.on{border-color:var(--accent);color:var(--accent)}
+.noise-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10.5px}
+.noise-tbl td{padding:5px 0;border-bottom:1px dashed var(--border-soft)}
+.noise-tbl td:first-child{color:var(--text-muted)}
+.noise-tbl td:last-child{text-align:right;color:var(--text-primary)}
+.noise-tbl tr.hl td:last-child{color:var(--accent)}
+
+.bottom{grid-column:1/-1;border-top:1px solid var(--border);background:var(--bg-panel);padding:10px 18px;display:grid;grid-template-columns:auto auto 1fr auto auto;gap:16px;align-items:center}
+.pctl{display:flex;gap:6px}
+.pbtn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:var(--bg-deep);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;border-radius:3px;transition:.2s}
+.pbtn:hover{border-color:var(--accent);color:var(--accent)}
+.pbtn.play{background:var(--accent);color:var(--bg-deep);border-color:var(--accent);box-shadow:0 0 16px var(--accent-glow)}
+.pbtn svg{width:14px;height:14px}
+.tdisp{font-family:var(--mono);font-size:11px;color:var(--text-secondary);white-space:nowrap}
+.tdisp b{color:var(--text-primary);font-weight:500}
+.slider{position:relative;height:24px;cursor:pointer}
+.slider .track{position:absolute;left:0;right:0;top:8px;height:4px;background:var(--bg-elevated);border-radius:2px}
+.slider .zone{position:absolute;top:8px;height:4px;background:rgba(239,68,68,.35)}
+.slider .prog{position:absolute;left:0;top:8px;height:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;box-shadow:0 0 8px var(--accent-glow)}
+.slider .thumb{position:absolute;top:10px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--accent);transform:translate(-50%,-50%);box-shadow:0 0 10px var(--accent-glow)}
+.speed{display:flex;gap:3px}
+.speed button{padding:6px 8px;background:var(--bg-deep);border:1px solid var(--border);color:var(--text-muted);font-family:var(--mono);font-size:10px;cursor:pointer;border-radius:2px}
+.speed button.on{background:var(--accent);color:var(--bg-deep);border-color:var(--accent)}
+.bextra{display:flex;gap:6px}
+
+@media (max-width:1180px){
+  html,body{overflow:auto}
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto auto auto auto;height:auto}
+  .canvas-area{grid-row:2;height:130vw;max-height:1100px}
+  .left-panel{grid-row:3;border-right:none}.right-panel{grid-row:4;border-left:none}
+  .bottom{grid-row:5;position:sticky;bottom:0;grid-template-columns:auto 1fr;z-index:5;gap:10px}
+  .bottom .slider{grid-column:1/-1;grid-row:1}.speed{justify-content:flex-end}.ccount{display:none}
+  .bottom .tdisp,.bottom .bextra{display:none}
+  header{height:auto;flex-wrap:wrap;padding:10px 14px}.hstat{flex-wrap:wrap}
+  .landing{overflow:auto}.landing-main{grid-template-columns:1fr;padding:24px 18px;gap:28px}
+  .landing-top{padding:14px 18px}.landing-bottom{display:none}.status-stripe{display:none}
+  .pipe{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div class="landing" id="landing">
+  <canvas id="bg-net"></canvas>
+  <div class="landing-top">
+    <div class="logo-group">
+      <div class="hex-logo"></div>
+      <div class="logo-text"><h1>Cooperative Localization</h1><p>LiDAR V2X Pipeline · UrbanIng-V2X</p></div>
+    </div>
+    <div class="status-stripe">
+      <div><span class="dot"></span>System Ready</div>
+      <div id="landing-status">— configurations</div>
+      <div id="landing-time"></div>
+    </div>
+  </div>
+
+  <div class="landing-main">
+    <div class="landing-left">
+      <div class="tag-line">PhD Research · Autonomous Vehicles</div>
+      <h1 class="landing-title">
+        <span class="t1">Cooperative</span>
+        <span class="t2">Localization</span>
+        <span class="t1">Pipeline</span>
+        <span class="t3">LIDAR-BASED · DYNAMIC LANDMARKS · ADAPTIVE V2X · V2I · V2V</span>
+      </h1>
+      <p class="landing-subtitle">
+        LiDAR-based cooperative localization for robust and precise urban positioning.
+        3D bounding boxes detected by the <strong>onboard LiDAR</strong> of the ego vehicle and of a partner vehicle,
+        together with <strong>roadside infrastructure</strong> detections, are associated into shared <strong>dynamic landmarks</strong>
+        (cars, cyclists, pedestrians) and fused in a stacked-measurement EKF with a
+        <strong>data-driven cooperative covariance</strong> and automatic <strong>V2X / V2I / V2V / GNSS</strong> fallback.
+        Evaluated on the <strong>UrbanIng-V2X</strong> dataset against an EKF GNSS/IMU and FAST-LIO2.
+      </p>
+      <div class="kw">
+        <span><b>◆</b> Onboard LiDAR</span><span><b>◆</b> Dynamic landmarks</span><span><b>◆</b> Data-driven covariance</span>
+        <span><b>◆</b> Stacked-measurement EKF</span><span><b>◆</b> V2X · V2I · V2V</span>
+      </div>
+      <div class="pipe">
+        <div><div class="n">01</div><div class="h">LiDAR perception</div><div class="d">3D BBoxes from V<sub>ego</sub>, V<sub>part</sub> and INFRA</div></div>
+        <div><div class="n">02</div><div class="h">BEV-IoU association</div><div class="d">Union-Find over INFRA, V<sub>ego</sub>, V<sub>part</sub></div></div>
+        <div><div class="n">03</div><div class="h">WBF dynamic landmarks</div><div class="d">Ego-pose inversion + disagreement covariance</div></div>
+        <div><div class="n">04</div><div class="h">Adaptive stacked EKF</div><div class="d">V2X ▸ V2I ▸ V2V ▸ degraded GNSS</div></div>
+      </div>
+      <div class="author-block">
+        <div class="author-info"><span class="author-label">Researcher</span><span class="author-name">Ahmed Rafik Islem BELHADEF</span><span class="author-role">PhD Student</span></div>
+        <div class="author-sep"></div>
+        <div class="author-info"><span class="author-label">Institution</span><span class="author-name">ESTACA · Paris-Saclay</span><span class="author-role">VEDECOM Institute</span></div>
+      </div>
+    </div>
+
+    <div class="landing-right">
+      <div class="select-panel">
+        <h3>RUN CONFIGURATION</h3>
+        <div class="step active" id="step-1">
+          <div class="step-label"><div class="step-num">1</div><div class="step-title">Noise configuration · GNSS × 3D BBox</div></div>
+          <div class="noise-grid" id="noise-chips"></div>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-label"><div class="step-num">2</div><div class="step-title">Intersection</div></div>
+          <div class="chip-group" id="inter-chips">
+            <div class="chip chip-big disabled" data-inter="1">01<span class="chip-badge">Crossing 1</span></div>
+            <div class="chip chip-big disabled" data-inter="2">02<span class="chip-badge">Crossing 2</span></div>
+            <div class="chip chip-big disabled" data-inter="3">03<span class="chip-badge">Crossing 3</span></div>
+          </div>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-label"><div class="step-num">3</div><div class="step-title">Sequence</div></div>
+          <select class="seq-select" id="seq-select" disabled><option value="">— Select a sequence —</option></select>
+        </div>
+        <button class="launch-btn" id="launch-btn" disabled>Launch Pipeline →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="landing-bottom">
+    <div class="corners"><span>◢ LiDAR perception</span><span>◢ Dynamic landmarks</span><span>◢ Adaptive V2X</span></div>
+    <div>© 2026 · ESTACA × VEDECOM · UrbanIng-V2X</div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading"><div class="loader-hex"><div></div><div></div><div></div></div><div class="loading-text" id="loading-text">Loading…</div></div>
+<div class="error-banner" id="error-banner"><button class="close" onclick="this.parentNode.classList.remove('show')">×</button><span id="error-text"></span></div>
+
+<!-- DASHBOARD -->
+<div class="app" id="app">
+  <header>
+    <div class="brand"><div class="brand-logo"></div>
+      <div class="brand-text"><h1>LiDAR V2X Cooperative Localization</h1><p>ESTACA · VEDECOM · Pipeline</p></div></div>
+    <div class="hstat">
+      <div class="hbadge"><span class="status-dot"></span><span class="v" id="seqname">—</span></div>
+      <div class="hbadge gnss"><span class="k">GNSS σ</span><span class="v" id="h-gnss">—</span></div>
+      <div class="hbadge bbox"><span class="k">BBOX INFRA σ</span><span class="v" id="h-bbox">—</span></div>
+      <div class="hbadge demo" id="h-demo">SYNTHETIC DEMO DATA</div>
+      <button class="btn" id="btn-back">◂ Menu</button>
+    </div>
+  </header>
+
+  <aside class="left-panel">
+    <div class="section">
+      <div class="section-title">LiDAR only × Communication<span class="aux">V1 / V2</span></div>
+      <div class="scen-grid" id="matrix"></div>
+      <button class="btn all-btn" id="btn-all">Show V2V, V2I and V2X together</button>
+      <div class="pick-hint">Click a scenario to show it on the map</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Display</div>
+      <div class="tg on" data-tg="landmarks">Dynamic landmarks (3D BBoxes)<span class="sw2"></span></div>
+      <div class="tg on" data-tg="rings">Cooperative landmarks (circles)<span class="sw2"></span></div>
+      <div class="tg on" data-tg="links">Link landmark → estimated position<span class="sw2"></span></div>
+      <div class="tg on" data-tg="gnss">Noisy GNSS<span class="sw2"></span></div>
+      <div class="tg on" data-tg="range">Infrastructure LiDAR ranges<span class="sw2"></span></div>
+      <div class="tg on" data-tg="map">OSM map<span class="sw2"></span></div>
+      <div class="tg on" data-tg="trail">Short trails only<span class="sw2"></span></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Legend</div>
+      <div class="lgd">
+        <div class="lgh">Vehicle &amp; trajectories</div>
+        <div class="lr"><svg viewBox="0 0 26 14"><path d="M20 7 L8 2 L10 7 L8 12Z" fill="#f8fafc"/></svg><span>Ego vehicle — true position</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><line x1="2" y1="7" x2="24" y2="7" stroke="#f8fafc" stroke-width="2"/></svg><span>Ground-truth trajectory</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><line x1="2" y1="7" x2="20" y2="7" stroke="#22d3ee" stroke-width="2.4"/><circle cx="21" cy="7" r="3" fill="#22d3ee"/></svg><span>Estimated trajectory (colour = scenario)</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><line x1="2" y1="7" x2="24" y2="7" stroke="#22d3ee" stroke-width="2.4"/></svg><span>V2X</span>
+          <svg viewBox="0 0 26 14"><line x1="2" y1="7" x2="24" y2="7" stroke="#34d399" stroke-width="2" stroke-dasharray="6 3"/></svg><span>V2I</span>
+          <svg viewBox="0 0 26 14"><line x1="2" y1="7" x2="24" y2="7" stroke="#fbbf24" stroke-width="2" stroke-dasharray="2 3"/></svg><span>V2V</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><circle cx="6" cy="7" r="1.6" fill="#f59e0b"/><circle cx="12" cy="5" r="1.6" fill="#4a9eff"/><circle cx="18" cy="9" r="1.6" fill="#4a9eff"/></svg><span>Noisy GNSS (orange outside · blue inside the zone)</span></div>
+
+        <div class="lgh">Dynamic landmarks — road users</div>
+        <div class="lr"><i class="cc" style="background:var(--car)"></i><span>Car</span><i class="cc" style="background:var(--ped)"></i><span>Pedestrian</span><i class="cc" style="background:var(--cyclist)"></i><span>Cyclist</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><rect x="5" y="3" width="16" height="8" fill="#22c55e55" stroke="#22c55e" stroke-width="1.4"/></svg><span>Seen by the ego vehicle</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><rect x="5" y="3" width="16" height="8" fill="#22c55e1f" stroke="#22c55e" stroke-width="1"/></svg><span>Seen by the infrastructure</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><rect x="5" y="3" width="16" height="8" fill="none" stroke="#22c55e" stroke-width="1.4" stroke-dasharray="4 3"/></svg><span>Seen by the partner vehicle</span></div>
+
+        <div class="lgh">Cooperation (scenario on the map)</div>
+        <div class="lr"><svg viewBox="0 0 26 14"><circle cx="13" cy="7" r="5.5" fill="none" stroke="#cbd5e1" stroke-opacity=".75" stroke-width="1.2" stroke-dasharray="2 2"/></svg><span>Candidate landmark (associated &amp; fused)</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><circle cx="13" cy="7" r="5.5" fill="none" stroke="#22d3ee" stroke-width="2.2"/></svg><span>Landmark actually used by the EKF now (colour = scenario)</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><line x1="2" y1="7" x2="24" y2="7" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="4 4"/></svg><span>Correction: used landmark → estimated position</span></div>
+        <div class="lr"><svg viewBox="0 0 34 14"><rect x="1" y="1" width="32" height="12" fill="#04070a" stroke="#cbd5e1"/><text x="17" y="10" font-size="6.5" fill="#e8eef5" text-anchor="middle" font-family="monospace">INFRA+V1</text></svg><span>Agents that saw the landmark</span></div>
+
+        <div class="lgh">Infrastructure</div>
+        <div class="lr"><svg viewBox="0 0 26 14"><circle cx="13" cy="7" r="3" fill="#00d4ff"/></svg><span>Roadside LiDAR</span><svg viewBox="0 0 26 14"><path d="M13 2 L18 11 L8 11Z" fill="#e8eef5"/></svg><span>Thermal camera</span></div>
+        <div class="lr"><svg viewBox="0 0 26 14"><circle cx="13" cy="7" r="6" fill="none" stroke="#22d3ee" stroke-opacity=".6" stroke-dasharray="3 2"/></svg><span>LiDAR coverage (45 m)</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="canvas-area">
+    <div class="cw" id="cw-v1">
+      <div class="clabel">VEHICLE 1 <span class="spd" id="spd-v1">— m/s</span></div>
+      <div class="cmode" id="mode-v1"><span class="d"></span><span class="t">—</span></div>
+      <canvas id="canvas-v1"></canvas>
+      <div class="ccount" id="cnt-v1"></div>
+      <div class="czoom"><button data-z="in" title="Zoom in">+</button><button data-z="out" title="Zoom out">−</button><button data-z="fit" title="Fit">⤢</button><button data-z="follow" title="Follow ego (F)">◎</button></div>
+    </div>
+    <div class="cw" id="cw-v2">
+      <div class="clabel">VEHICLE 2 <span class="spd" id="spd-v2">— m/s</span></div>
+      <div class="cmode" id="mode-v2"><span class="d"></span><span class="t">—</span></div>
+      <canvas id="canvas-v2"></canvas>
+      <div class="ccount" id="cnt-v2"></div>
+      <div class="czoom"><button data-z="in">+</button><button data-z="out">−</button><button data-z="fit">⤢</button><button data-z="follow">◎</button></div>
+    </div>
+  </section>
+
+  <aside class="right-panel">
+    <div class="section">
+      <div class="section-title">Real-time telemetry</div>
+      <div class="telem-grid">
+        <div class="telem-card wide"><div class="telem-label">Frame · time</div><div class="telem-value"><span id="frame-display">0 / 0</span><span class="telem-unit" id="time-display">· 0.00 s</span></div></div>
+        <div class="telem-card"><div class="telem-label">Phase V1</div><div class="telem-value" style="font-size:12px;margin-top:7px" id="ph-v1">—</div></div>
+        <div class="telem-card"><div class="telem-label">Phase V2</div><div class="telem-value" style="font-size:12px;margin-top:7px" id="ph-v2">—</div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Individual baselines<span class="aux">RMSE V1 / V2</span></div>
+      <div id="base-list"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Live cumulative RMSE</div>
+      <div class="vtabs"><button class="btn on" data-rv="vehicle1">Vehicle 1</button><button class="btn" data-rv="vehicle2">Vehicle 2</button></div>
+      <div class="rank" id="rank"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Used landmark</div>
+      <div id="insp-name" style="font-family:var(--mono);font-size:10.5px;margin:-4px 0 10px;letter-spacing:.06em">—</div>
+      <div id="insp"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Noise model</div>
+      <table class="noise-tbl" id="noise-tbl"></table>
+    </div>
+  </aside>
+
+  <div class="bottom">
+    <div class="pctl">
+      <button class="pbtn" id="btn-reset" title="Restart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+      <button class="pbtn play" id="btn-play" title="Play (space)"><svg viewBox="0 0 24 24" fill="currentColor" id="play-ico"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="pbtn" id="btn-step" title="Step (→)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+    </div>
+    <div class="tdisp"><b id="t-cur">0.00</b>s / <span id="t-tot">0.00</span>s</div>
+    <div class="slider" id="slider">
+      <div class="track"></div><div class="zone" id="slider-zone"></div><div class="prog" id="slider-prog"></div>
+      <div class="thumb" id="slider-thumb"></div>
+    </div>
+    <div class="speed" id="speed"><button data-s="0.25">.25×</button><button data-s="0.5">.5×</button><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="4">4×</button></div>
+    <div class="bextra"><button class="btn" id="btn-shot" title="Export PNG">⤓ PNG</button></div>
+  </div>
+</div>
+
+<script>
+/* CONFIGURATION — LiDAR only, V2V / V2I / V2X + individual baselines */
+const CSS = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MOD = 'L';
+const SCENS = [
+  { id:'V2V', desc:'V<sub>ego</sub> + V<sub>part</sub>',          dash:[2,4], w:1.8 },
+  { id:'V2I', desc:'INFRA + V<sub>ego</sub>',                      dash:[7,4], w:2.0 },
+  { id:'V2X', desc:'INFRA + V<sub>ego</sub> + V<sub>part</sub>',   dash:[],    w:2.4 },
+];
+const BASES = [
+  { id:'gps', name:'EKF GNSS/IMU', tag:'IND', color:CSS('--gps'), x:'traj_gps_x', y:'traj_gps_y', r:'rmse_gps', dash:[],         w:1.6, span:'all'  },
+  { id:'fl2', name:'FAST-LIO2',    tag:'IND', color:CSS('--fl2'), x:'fl2_x',      y:'fl2_y',      r:'rmse_fl2', dash:[4,4,10,4], w:1.6, span:'eval' },
+];
+const SCEN_COL = { V2V:'#fbbf24', V2I:'#34d399', V2X:CSS('--m-L') };
+const CLASS_COL = [CSS('--car'), CSS('--ped'), CSS('--cyclist')];
+const CLASS_NAME = ['Car','Pedestrian','Cyclist'];
+const SUBMODE = { X:{t:'V2X · INFRA + V1 + V2', c:CSS('--sm-X')}, I:{t:'V2I · INFRA + ego', c:CSS('--sm-I')},
+                  V:{t:'V2V · ego + partner', c:CSS('--sm-V')}, z:{t:'Degraded GNSS fallback', c:CSS('--sm-z')}, o:{t:'Individual mode · GNSS/IMU', c:'#3b4655'} };
+
+const METHODS = {};
+BASES.forEach(b => METHODS[b.id] = { ...b, kind:'base' });
+SCENS.forEach(s => {
+  const id = `${MOD}_${s.id}`;
+  METHODS[id] = { id, kind:'coop', mod:MOD, scen:s.id, name:`LiDAR only · ${s.id}`, color:SCEN_COL[s.id], dash:s.dash, w:s.w, span:'eval' };
+});
+
+const state = {
+  manifest:null, data:null, sel:{noise:null, inter:null, seq:null},
+  frame:0, playing:false, speed:1, baseMs:10, acc:0, lastT:0,
+  on:new Set(['gps','fl2','L_V2X']),
+  focus:'L_V2X', rankVeh:'vehicle1', showAll:false,
+  show:{landmarks:true, rings:true, links:true, gnss:true, range:true, map:true, trail:true},
+  views:{}, follow:{vehicle1:false, vehicle2:false}, dash:0,
+};
+
+const $ = id => document.getElementById(id);
+function showError(m){ $('error-text').textContent = m; $('error-banner').classList.add('show'); setTimeout(()=>$('error-banner').classList.remove('show'), 7000); }
+function setLoading(v, t){ if (t) $('loading-text').textContent = t; $('loading').classList.toggle('show', v); }
+const fmt = (v, d=3) => (v === null || v === undefined || Number.isNaN(v)) ? '—' : v.toFixed(d);
+setInterval(() => { $('landing-time').textContent = new Date().toLocaleTimeString('en-GB'); }, 1000);
+
+/* LANDING — animated background */
+(function bgNet(){
+  const c = $('bg-net'), ctx = c.getContext('2d');
+  let W, H, agents = [];
+  function resize(){ const d = devicePixelRatio||1; W = c.clientWidth; H = c.clientHeight; c.width = W*d; c.height = H*d; ctx.setTransform(d,0,0,d,0,0); }
+  function spawn(){
+    const cls = Math.random() < .6 ? 0 : (Math.random() < .5 ? 1 : 2);
+    const hor = Math.random() < .5, dir = Math.random() < .5 ? 1 : -1;
+    const lane = (hor ? H : W) * (0.3 + Math.random()*0.4);
+    const sp = [1.1, .35, .7][cls] * (0.6 + Math.random()*.6);
+    return { cls, hor, dir, x: hor ? (dir>0 ? -20 : W+20) : lane, y: hor ? lane : (dir>0 ? -20 : H+20), sp };
+  }
+  const rsu = () => [[W*.52, H*.3], [W*.86, H*.72], [W*.3, H*.78]];
+  function frame(){
+    if (!$('landing').classList.contains('hidden')) {
+      ctx.clearRect(0,0,W,H);
+      while (agents.length < 26) agents.push(spawn());
+      const R = rsu();
+      agents.forEach(a => { if (a.hor) a.x += a.sp*a.dir; else a.y += a.sp*a.dir; });
+      agents = agents.filter(a => a.x > -40 && a.x < W+40 && a.y > -40 && a.y < H+40);
+      const t = performance.now()/40;
+      ctx.lineWidth = 1;
+      agents.forEach(a => R.forEach(r => {
+        const d = Math.hypot(a.x-r[0], a.y-r[1]);
+        if (d < 260) { ctx.strokeStyle = `rgba(0,212,255,${.22*(1-d/260)})`; ctx.setLineDash([3,5]); ctx.lineDashOffset = -t;
+          ctx.beginPath(); ctx.moveTo(r[0], r[1]); ctx.lineTo(a.x, a.y); ctx.stroke(); }
+      }));
+      ctx.setLineDash([]);
+      agents.forEach(a => {
+        const col = CLASS_COL[a.cls], s = [[14,6],[4,4],[8,3]][a.cls];
+        ctx.save(); ctx.translate(a.x, a.y); if (!a.hor) ctx.rotate(Math.PI/2);
+        ctx.fillStyle = col + '33'; ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 8;
+        ctx.fillRect(-s[0]/2, -s[1]/2, s[0], s[1]); ctx.strokeRect(-s[0]/2, -s[1]/2, s[0], s[1]); ctx.restore();
+      });
+      R.forEach(r => { ctx.fillStyle = '#00d4ff'; ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(r[0], r[1], 3.5, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(0,212,255,.12)'; ctx.beginPath(); ctx.arc(r[0], r[1], 26 + (performance.now()/30)%40, 0, 7); ctx.stroke(); });
+    }
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', resize); resize(); frame();
+})();
+
+/* LANDING — manifest & selection */
+function noiseInfo(n){
+  const out  = n.gnss_out  ?? n.hors_zone ?? parseFloat(n.tag);
+  const zone = n.gnss_zone ?? n.zone      ?? parseFloat(n.tag.split('_')[1]);
+  return { out, zone, bxy: n.bbox_xy ?? null, byaw: n.bbox_yaw_deg ?? null };
+}
+async function loadManifest(){
+  try {
+    setLoading(true, 'Loading manifest…');
+    const r = await fetch('manifest.json', {cache:'no-cache'});
+    if (!r.ok) throw new Error(`manifest.json not found (${r.status})`);
+    state.manifest = await r.json();
+    const box = $('noise-chips'); box.innerHTML = '';
+    state.manifest.noise_configs.forEach((n, i) => {
+      const I = noiseInfo(n);
+      const d = document.createElement('div');
+      d.className = 'chip noise-chip'; d.dataset.noise = n.tag;
+      d.innerHTML = `<span class="nc-id">C${i+1}</span><div class="nc-k">GNSS σ OUT / ZONE</div><div class="nc-v">${I.out} – ${I.zone} m</div>
+        <div class="nc-k">BBOX INFRA σ XY / ψ</div><div class="nc-b">${I.bxy !== null ? `${I.bxy} m · ${I.byaw}°` : '—'}</div>`;
+      d.onclick = () => selectNoise(n.tag);
+      box.appendChild(d);
+    });
+    $('landing-status').textContent = `${state.manifest.sequences.length} runs · ${state.manifest.noise_configs.length} noise configs`;
+    setLoading(false);
+  } catch (e) {
+    setLoading(false);
+    showError('Manifest loading failed: ' + e.message + ' — serve the folder over HTTP (python3 -m http.server 8000).');
+  }
+}
+function selectNoise(tag){
+  Object.assign(state.sel, {noise:tag, inter:null, seq:null});
+  document.querySelectorAll('#noise-chips .chip').forEach(c => c.classList.toggle('selected', c.dataset.noise === tag));
+  $('step-1').className = 'step done'; $('step-2').className = 'step active'; $('step-3').className = 'step';
+  const avail = new Set(state.manifest.sequences.filter(s => s.noise_tag === tag).map(s => s.intersection));
+  document.querySelectorAll('#inter-chips .chip').forEach(c => {
+    const n = +c.dataset.inter; c.classList.remove('selected');
+    c.classList.toggle('disabled', !avail.has(n)); c.onclick = avail.has(n) ? () => selectInter(n) : null;
+  });
+  $('seq-select').disabled = true; $('seq-select').innerHTML = '<option value="">— Select a sequence —</option>'; $('launch-btn').disabled = true;
+}
+function selectInter(n){
+  state.sel.inter = n; state.sel.seq = null;
+  document.querySelectorAll('#inter-chips .chip').forEach(c => c.classList.toggle('selected', +c.dataset.inter === n));
+  $('step-2').className = 'step done'; $('step-3').className = 'step active';
+  const sel = $('seq-select'); sel.disabled = false; sel.innerHTML = '<option value="">— Select a sequence —</option>';
+  state.manifest.sequences.filter(s => s.noise_tag === state.sel.noise && s.intersection === n).forEach(s => {
+    const o = document.createElement('option'); o.value = s.file; o.textContent = s.sequence; sel.appendChild(o);
+  });
+  sel.onchange = e => { state.sel.seq = e.target.value || null; $('launch-btn').disabled = !state.sel.seq; $('step-3').className = state.sel.seq ? 'step done' : 'step active'; };
+  $('launch-btn').disabled = true;
+}
+$('launch-btn').onclick = async () => {
+  if (!state.sel.seq) return;
+  setLoading(true, 'Loading sequence…');
+  try {
+    const r = await fetch(state.sel.seq); if (!r.ok) throw new Error(`${state.sel.seq} not found`);
+    const data = await r.json(); setLoading(false); initDashboard(data);
+  } catch (e) { setLoading(false); showError('Error: ' + e.message); }
+};
+$('btn-back').onclick = () => { togglePlay(false); $('app').classList.remove('visible'); $('landing').classList.remove('hidden'); };
+
+/* DATA PREPARATION */
+function prepVehicle(d){
+  const N = d.temps_s.length;
+  // evaluation frames — same as the offline RMSE
+  const evalMask = new Uint8Array(N);
+  for (let i = d.i_ndt_deb; i <= d.i_fin; i++) if (d.capteurs_ndt[i] && d.capteurs_ndt[i].includes('ndt')) evalMask[i] = 1;
+  d._evalIdx = []; for (let i = 0; i < N; i++) if (evalMask[i]) d._evalIdx.push(i);
+  d._tr = {}; d._cum = {};
+  for (const id in METHODS) {
+    const M = METHODS[id]; let xs, ys, mode = null, lm = null, rmse = null;
+    if (M.kind === 'base') { xs = d[M.x]; ys = d[M.y]; rmse = d[M.r]; }
+    else { const m = d.methods && d.methods[id]; if (m) { xs = m.x; ys = m.y; mode = m.mode; lm = m.lm; rmse = m.rmse; } }
+    if (!xs || !ys || !xs.some(v => v != null)) continue;
+    const S = new Float64Array(N), C = new Uint32Array(N); let s = 0, c = 0;
+    for (let i = 0; i < N; i++) {
+      if (evalMask[i] && xs[i] != null) { const dx = xs[i]-d.pos_x_gt[i], dy = ys[i]-d.pos_y_gt[i]; s += dx*dx+dy*dy; c++; }
+      S[i] = s; C[i] = c;
+    }
+    let lmIdx = null;
+    if (lm) { lmIdx = new Int32Array(N).fill(-1); lm.forEach((r, j) => { for (let k = r[0]; k <= r[1] && k < N; k++) lmIdx[k] = j; }); }
+    d._tr[id] = { xs, ys, mode, lm, lmIdx, rmse };
+    d._cum[id] = { S, C };
+  }
+  d._tms = new Float64Array(N); const t0 = d.ts0_ms || 0;
+  for (let i = 0; i < N; i++) d._tms[i] = t0 + d.temps_s[i]*1000;
+}
+function nearestIdx(ts, t, tol){
+  if (!ts || !ts.length) return -1;
+  let lo = 0, hi = ts.length - 1;
+  while (lo < hi) { const m = (lo+hi) >> 1; if (ts[m] < t) lo = m+1; else hi = m; }
+  let best = lo; if (lo > 0 && Math.abs(ts[lo-1]-t) <= Math.abs(ts[lo]-t)) best = lo-1;
+  return Math.abs(ts[best]-t) <= tol ? best : -1;
+}
+
+/* DASHBOARD INIT */
+function initDashboard(data){
+  state.data = data; state.frame = 0;
+  ['vehicle1','vehicle2'].forEach(v => prepVehicle(data[v]));
+  $('landing').classList.add('hidden'); $('app').classList.add('visible');
+  const nz = data.noise || {}, par = data.parametres || {};
+  const gout = nz.gnss_out ?? par.sigma_gps_xy, gzone = nz.gnss_zone ?? par.sigma_gps_xy_zone;
+  $('seqname').textContent = data.sequence;
+  $('h-gnss').textContent = `${gout} / ${gzone} m`;
+  $('h-bbox').textContent = nz.bbox_xy != null ? `${nz.bbox_xy} m / ${nz.bbox_yaw_deg}°` : '—';
+  $('h-demo').style.display = data.demo ? 'flex' : 'none';
+  $('noise-tbl').innerHTML = [
+    ['GNSS X,Y · outside zone', `${gout} m`, 1], ['GNSS X,Y · intersection zone', `${gzone} m`, 1],
+    ['GNSS heading ψ', `${fmt((nz.gnss_psi ?? 0.001)*180/Math.PI, 4)}°`], ['IMU speed v', `${nz.imu_v ?? 0.02} m/s`],
+    ['IMU accel. a', `${nz.imu_a ?? 0.01} m/s²`], ['IMU yaw rate ω', `${nz.imu_w ?? 0.05} rad/s`],
+    ['BBox INFRA X,Y', nz.bbox_xy != null ? `${nz.bbox_xy} m` : '—', 1], ['BBox INFRA ψ', nz.bbox_yaw_deg != null ? `${nz.bbox_yaw_deg}°` : '—', 1],
+    ['RMSE frames', 'cooperative window'],
+  ].map(r => `<tr class="${r[2]?'hl':''}"><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+
+  buildBaseList(); buildMatrix();
+  if (!availableAnywhere(state.focus)) state.focus = COOP_IDS().find(availableAnywhere) || null;
+  if (state.focus) setFocusSilent(state.focus);
+  refreshMatrix(); buildRank(); fitViews();
+
+  const v1 = data.vehicle1, tmax = v1.temps_s[v1.temps_s.length-1];
+  $('t-tot').textContent = tmax.toFixed(2);
+  $('slider-zone').style.left = (v1.temps_s[v1.i_deb]/tmax*100) + '%';
+  $('slider-zone').style.width = ((v1.temps_s[v1.i_fin]-v1.temps_s[v1.i_deb])/tmax*100) + '%';
+  setTimeout(() => { setupCanvases(); fitViews(); render(); }, 120);
+}
+const availableAnywhere = id => ['vehicle1','vehicle2'].some(v => state.data[v]._tr[id]);
+const COOP_IDS = () => Object.keys(METHODS).filter(m => METHODS[m].kind === 'coop');
+
+/* baselines (right panel) */
+function buildBaseList(){
+  const box = $('base-list'); box.innerHTML = '';
+  BASES.forEach(b => {
+    const ok = availableAnywhere(b.id);
+    const el = document.createElement('div');
+    el.className = 'mrow' + (state.on.has(b.id) && ok ? ' on' : '') + (ok ? '' : ' na'); el.style.setProperty('--c', b.color);
+    el.innerHTML = `<span class="sw"></span><span class="mname">${b.name}<small>${b.tag}</small></span>
+      <span class="mval">${fmt(state.data.vehicle1[b.r])} / ${fmt(state.data.vehicle2[b.r])}</span>`;
+    if (ok) el.onclick = () => { toggle(b.id); el.classList.toggle('on', state.on.has(b.id)); };
+    box.appendChild(el);
+  });
+}
+/* LiDAR only × V2V / V2I / V2X cards */
+function buildMatrix(){
+  const box = $('matrix'); box.innerHTML = '';
+  SCENS.forEach(s => {
+    const id = `${MOD}_${s.id}`, M = METHODS[id], ok = availableAnywhere(id);
+    const c = document.createElement('div'); c.className = 'cell'; c.dataset.id = id; c.style.setProperty('--c', M.color);
+    const r1 = state.data.vehicle1._tr[id]?.rmse, r2 = state.data.vehicle2._tr[id]?.rmse;
+    const ln = s.id === 'V2I' ? `repeating-linear-gradient(90deg,${M.color} 0 5px,transparent 5px 8px)`
+             : s.id === 'V2V' ? `repeating-linear-gradient(90deg,${M.color} 0 2px,transparent 2px 5px)` : M.color;
+    c.innerHTML = `<div class="ln" style="background:${ln}"></div><div class="sc">${s.id}</div><div class="sd">${s.desc}</div>
+      <div class="v"><i>V1</i>${ok ? fmt(r1) : 'n/a'}</div><div class="v"><i>V2</i>${ok ? fmt(r2) : 'n/a'}</div>`;
+    if (!ok) c.classList.add('na'); else c.onclick = () => setFocus(id);
+    box.appendChild(c);
+  });
+  refreshMatrix();
+}
+function refreshMatrix(){
+  document.querySelectorAll('.cell[data-id]').forEach(c => {
+    c.classList.toggle('on', state.on.has(c.dataset.id)); c.classList.toggle('focus', state.focus === c.dataset.id);
+  });
+  const b = $('btn-all'); b.classList.toggle('on', state.showAll);
+  b.textContent = state.showAll ? 'Show only the selected scenario' : 'Show V2V, V2I and V2X together';
+}
+$('btn-all').onclick = () => { state.showAll = !state.showAll; if (state.focus) setFocus(state.focus); else refreshMatrix(); };
+function toggle(id){ state.on.has(id) ? state.on.delete(id) : state.on.add(id); refreshMatrix(); buildRank(); render(); }
+function setFocusSilent(id){
+  COOP_IDS().forEach(m => state.on.delete(m));
+  if (state.showAll) COOP_IDS().filter(availableAnywhere).forEach(m => state.on.add(m));
+  state.focus = id; state.on.add(id); refreshMatrix();
+}
+function setFocus(id){ setFocusSilent(id); buildRank(); render(); }
+document.querySelectorAll('.tg').forEach(t => t.onclick = () => {
+  const k = t.dataset.tg; state.show[k] = !state.show[k]; t.classList.toggle('on', state.show[k]); render();
+});
+
+/* VIEW (zoom / pan / follow) */
+function setupCanvases(){
+  ['vehicle1','vehicle2'].forEach((v, i) => {
+    const c = $(`canvas-v${i+1}`), r = c.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    c.width = Math.max(1, r.width*dpr); c.height = Math.max(1, r.height*dpr);
+    c.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+  });
+}
+function fitViews(){
+  const d = state.data;
+  const xs = [...d.vehicle1.pos_x_gt, ...d.vehicle2.pos_x_gt, ...d.infrastructures.map(i => i.x)];
+  const ys = [...d.vehicle1.pos_y_gt, ...d.vehicle2.pos_y_gt, ...d.infrastructures.map(i => i.y)];
+  const cx = (Math.min(...xs)+Math.max(...xs))/2, cy = (Math.min(...ys)+Math.max(...ys))/2;
+  const dv = Math.max((Math.max(...xs)-Math.min(...xs))*1.12/2, (Math.max(...ys)-Math.min(...ys))*1.12/2, 60);
+  ['vehicle1','vehicle2'].forEach(v => { state.views[v] = { cx, cy, dv }; state.follow[v] = false; });
+  document.querySelectorAll('[data-z="follow"]').forEach(b => b.classList.remove('on'));
+}
+function tf(canvas, veh){
+  const r = canvas.getBoundingClientRect(), V = state.views[veh];
+  let { cx, cy } = V;
+  if (state.follow[veh]) { const d = state.data[veh], k = Math.min(state.frame, d.temps_s.length-1); cx = d.pos_x_gt[k]; cy = d.pos_y_gt[k]; }
+  const s = Math.min(r.width, r.height)/(2*V.dv), ox = r.width/2, oy = r.height/2;
+  return { x:x => ox+(x-cx)*s, y:y => oy-(y-cy)*s, s, cx, cy, w:r.width, h:r.height, ix:X => cx+(X-ox)/s, iy:Y => cy-(Y-oy)/s };
+}
+['vehicle1','vehicle2'].forEach((veh, i) => {
+  const c = $(`canvas-v${i+1}`), wrap = $(`cw-v${i+1}`);
+  c.addEventListener('wheel', e => { e.preventDefault(); zoomAt(veh, c, e.deltaY < 0 ? 0.85 : 1/0.85, e.offsetX, e.offsetY); }, {passive:false});
+  let drag = null;
+  c.addEventListener('pointerdown', e => { drag = { x:e.clientX, y:e.clientY }; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', e => {
+    if (!drag) return; const T = tf(c, veh);
+    if (state.follow[veh]) { state.follow[veh] = false; state.views[veh].cx = T.cx; state.views[veh].cy = T.cy; wrap.querySelector('[data-z="follow"]').classList.remove('on'); }
+    state.views[veh].cx -= (e.clientX-drag.x)/T.s; state.views[veh].cy += (e.clientY-drag.y)/T.s; drag = { x:e.clientX, y:e.clientY }; render();
+  });
+  c.addEventListener('pointerup', () => drag = null);
+  c.addEventListener('dblclick', () => { fitViews(); render(); });
+  wrap.querySelectorAll('[data-z]').forEach(b => b.onclick = () => {
+    const z = b.dataset.z;
+    if (z === 'in') zoomAt(veh, c, .7); else if (z === 'out') zoomAt(veh, c, 1/.7);
+    else if (z === 'fit') { fitViews(); render(); }
+    else { state.follow[veh] = !state.follow[veh]; b.classList.toggle('on', state.follow[veh]); if (state.follow[veh] && state.views[veh].dv > 45) state.views[veh].dv = 32; render(); }
+  });
+});
+function zoomAt(veh, c, f, px, py){
+  const T = tf(c, veh), V = state.views[veh];
+  if (px !== undefined && !state.follow[veh]) { const wx = T.ix(px), wy = T.iy(py); V.dv *= f; V.cx = wx - (wx - V.cx)*f; V.cy = wy - (wy - V.cy)*f; }
+  else V.dv *= f;
+  V.dv = Math.min(Math.max(V.dv, 6), 400); render();
+}
+addEventListener('resize', () => { if (state.data) { setupCanvases(); render(); } });
+
+/* DRAWING */
+function drawGrid(ctx, T){
+  const step = T.s > 9 ? 5 : T.s > 3.5 ? 10 : 20;
+  const x0 = Math.floor(T.ix(0)/step)*step, x1 = T.ix(T.w), y0 = Math.floor(T.iy(T.h)/step)*step, y1 = T.iy(0);
+  ctx.strokeStyle = '#0d141d'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = x0; x <= x1; x += step) { ctx.moveTo(T.x(x), 0); ctx.lineTo(T.x(x), T.h); }
+  for (let y = y0; y <= y1; y += step) { ctx.moveTo(0, T.y(y)); ctx.lineTo(T.w, T.y(y)); }
+  ctx.stroke();
+  ctx.strokeStyle = '#1a2330'; ctx.beginPath(); ctx.moveTo(T.x(0), 0); ctx.lineTo(T.x(0), T.h); ctx.moveTo(0, T.y(0)); ctx.lineTo(T.w, T.y(0)); ctx.stroke();
+  const m = step*2, px = m*T.s; ctx.strokeStyle = '#4d5968'; ctx.fillStyle = '#4d5968'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(T.w-18-px, T.h-48); ctx.lineTo(T.w-18, T.h-48); ctx.moveTo(T.w-18-px, T.h-52); ctx.lineTo(T.w-18-px, T.h-44); ctx.moveTo(T.w-18, T.h-52); ctx.lineTo(T.w-18, T.h-44); ctx.stroke();
+  ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'center'; ctx.fillText(`${m} m`, T.w-18-px/2, T.h-56);
+}
+function drawMap(ctx, T){
+  const osm = state.data.carte_osm; if (!state.show.map || !osm) return;
+  ctx.fillStyle = 'rgba(60,70,85,.22)';
+  osm.road_polys.forEach(p => { ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(T.x(q[0]), T.y(q[1])) : ctx.moveTo(T.x(q[0]), T.y(q[1]))); ctx.closePath(); ctx.fill(); });
+  ctx.strokeStyle = 'rgba(120,130,150,.35)'; ctx.lineWidth = 1;
+  osm.curbs.forEach(p => { ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(T.x(q[0]), T.y(q[1])) : ctx.moveTo(T.x(q[0]), T.y(q[1]))); ctx.stroke(); });
+  ctx.strokeStyle = 'rgba(160,170,185,.18)'; ctx.setLineDash([4,6]);
+  (osm.lines || []).forEach(l => { const p = l.coords || l[1]; if (!p) return; ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(T.x(q[0]), T.y(q[1])) : ctx.moveTo(T.x(q[0]), T.y(q[1]))); ctx.stroke(); });
+  ctx.setLineDash([]);
+}
+function drawInfra(ctx, T){
+  const d = state.data, cols = ['rgba(34,211,238,', 'rgba(129,140,248,'];
+  Object.entries(d.lidars_infra).forEach(([k, l], i) => {
+    if (state.show.range) {
+      ctx.beginPath(); ctx.arc(T.x(l.x), T.y(l.y), l.portee*T.s, 0, 2*Math.PI);
+      ctx.fillStyle = cols[i%2] + '.035)'; ctx.fill();
+      ctx.strokeStyle = cols[i%2] + '.28)'; ctx.setLineDash([4,4]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.fillStyle = cols[i%2] + '1)'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'left';
+    ctx.fillText(`${k.split('_')[1]} · ${l.nom}`, T.x(l.x)+9, T.y(l.y)-8);
+  });
+  d.infrastructures.forEach(c => {
+    const X = T.x(c.x), Y = T.y(c.y); ctx.save();
+    if (c.type === 'lidar') { ctx.fillStyle = '#00d4ff'; ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(X, Y, 3.5, 0, 7); ctx.fill(); }
+    else { ctx.fillStyle = '#e8eef5'; ctx.strokeStyle = '#0a0f14'; ctx.translate(X, Y); ctx.beginPath(); ctx.moveTo(0,-5); ctx.lineTo(5,4); ctx.lineTo(-5,4); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+  });
+}
+function path(ctx, T, xs, ys, idx){
+  ctx.beginPath(); let st = false;
+  for (const i of idx) { const x = xs[i], y = ys[i]; if (x == null || y == null) { st = false; continue; } const X = T.x(x), Y = T.y(y); st ? ctx.lineTo(X, Y) : (ctx.moveTo(X, Y), st = true); }
+  ctx.stroke();
+}
+function range(a, b){ const r = []; for (let i = a; i <= b; i++) r.push(i); return r; }
+function spanIdx(d, M, k){
+  const lo = state.show.trail ? Math.max(0, k-300) : 0;
+  if (M.span === 'all') return range(lo, k);
+  const out = []; for (const i of d._evalIdx) { if (i > k) break; if (i >= lo) out.push(i); } return out;
+}
+function box(ctx, T, b, style, alpha){
+  const [x, y, L, W, yaw, cls] = b, col = CLASS_COL[cls] || '#fff';
+  const c = Math.cos(yaw), s = Math.sin(yaw), hl = L/2, hw = W/2;
+  const P = [[hl,hw],[-hl,hw],[-hl,-hw],[hl,-hw]].map(([u,v]) => [T.x(x + c*u - s*v), T.y(y + s*u + c*v)]);
+  ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.globalAlpha = alpha;
+  if (style === 'ego') { ctx.fillStyle = col + '55'; ctx.fill(); }
+  if (style === 'infra') { ctx.fillStyle = col + '1f'; ctx.fill(); }
+  ctx.strokeStyle = col; ctx.lineWidth = style === 'infra' ? 1.1 : 1.4;
+  ctx.setLineDash(style === 'partner' ? [4,3] : []); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(T.x(x), T.y(y)); ctx.lineTo(T.x(x + c*hl), T.y(y + s*hl)); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+function detFrame(src, tms, tol){ if (!src) return null; const i = nearestIdx(src.t, tms, tol); return i < 0 ? null : src.b[i]; }
+function drawLandmarks(ctx, T, veh, k){
+  const D = state.data.detections, d = state.data[veh], cnt = [0,0,0];
+  if (!D || !state.show.landmarks) return cnt;
+  const tms = d._tms[k], tol = D.tol_ms || 60;
+  const ego = veh === 'vehicle1' ? 'V1' : 'V2', part = ego === 'V1' ? 'V2' : 'V1';
+  const inf = detFrame(D.infra, tms, tol), eb = detFrame(D[ego] && D[ego][MOD], tms, tol), pb = detFrame(D[part] && D[part][MOD], tms, tol);
+  (inf || []).forEach(b => { box(ctx, T, b, 'infra', .8); cnt[b[5]]++; });
+  (pb || []).forEach(b => box(ctx, T, b, 'partner', .85));
+  (eb || []).forEach(b => box(ctx, T, b, 'ego', 1));
+  return cnt;
+}
+function drawUsedLandmarks(ctx, T, d, k, ringsById){
+  for (const [key, L] of ringsById) {
+    const r0 = L[0].run, X = T.x(r0[2]), Y = T.y(r0[3]);
+    const base = 8 + Math.max(r0[5], r0[6])*T.s*.5;
+    L.forEach((u, j) => {
+      const M = METHODS[u.id], rad = base + j*4;
+      if (state.show.links && u.ex != null) {
+        ctx.save(); ctx.strokeStyle = M.color; ctx.globalAlpha = .7; ctx.lineWidth = 1.2; ctx.setLineDash([4,4]); ctx.lineDashOffset = -state.dash;
+        ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(T.x(u.ex), T.y(u.ey)); ctx.stroke(); ctx.restore();
+      }
+      ctx.save(); ctx.strokeStyle = M.color; ctx.lineWidth = 2.4; ctx.shadowColor = M.color; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(X, Y, rad, 0, 2*Math.PI); ctx.stroke();
+      const p = (state.dash % 40) / 40; ctx.globalAlpha = .45*(1-p); ctx.lineWidth = 1.5; ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(X, Y, rad + 3 + p*10, 0, 2*Math.PI); ctx.stroke();
+      ctx.restore();
+    });
+    const txt = `USED · ${srcTxt(r0[8])}`, lx = X + base + L.length*4 + 4, ly = Y - base*.6;
+    ctx.font = '600 10px JetBrains Mono'; const w = ctx.measureText(txt).width + 10;
+    ctx.fillStyle = 'rgba(4,7,10,.85)'; ctx.strokeStyle = METHODS[L[0].id].color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.rect(lx, ly - 9, w, 15); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e8eef5'; ctx.textAlign = 'left'; ctx.fillText(txt, lx + 5, ly + 2);
+  }
+}
+/* candidate cooperative landmarks — same association rule as the pipeline (display only) */
+function bevPoly(b){ const c = Math.cos(b.yaw), s = Math.sin(b.yaw), hl = b.L/2, hw = b.W/2;
+  return [[hl,hw],[-hl,hw],[-hl,-hw],[hl,-hw]].map(([u,v]) => [b.x + c*u - s*v, b.y + s*u + c*v]); }
+function clipArea(p1, p2){
+  const cross = (o,a,b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+  const iseg = (a,b,c,d) => { const A1=b[1]-a[1], B1=a[0]-b[0], C1=A1*a[0]+B1*a[1], A2=d[1]-c[1], B2=c[0]-d[0], C2=A2*c[0]+B2*c[1], det=A1*B2-A2*B1;
+    return Math.abs(det) < 1e-10 ? a : [(C1*B2-C2*B1)/det, (A1*C2-A2*C1)/det]; };
+  let out = p1.slice();
+  for (let i = 0; i < p2.length && out.length; i++) {
+    const inp = out; out = []; const es = p2[(i+3)%4], ee = p2[i];
+    for (let j = 0; j < inp.length; j++) {
+      const cur = inp[j], prev = inp[(j+inp.length-1)%inp.length], ci = cross(es,ee,cur) >= 0, pi = cross(es,ee,prev) >= 0;
+      if (ci) { if (!pi) out.push(iseg(prev,cur,es,ee)); out.push(cur); } else if (pi) out.push(iseg(prev,cur,es,ee));
+    }
+  }
+  if (out.length < 3) return 0; let a = 0;
+  for (let i = 0; i < out.length; i++) { const p = out[i], q = out[(i+1)%out.length]; a += p[0]*q[1] - q[0]*p[1]; }
+  return Math.abs(a)/2;
+}
+function iouBev(a, b){
+  const r = (Math.hypot(a.L, a.W) + Math.hypot(b.L, b.W))/2; if (Math.hypot(a.x-b.x, a.y-b.y) > r) return 0;
+  const inter = clipArea(bevPoly(a), bevPoly(b)), uni = a.L*a.W + b.L*b.W - inter; return uni > 1e-6 ? inter/uni : 0;
+}
+const _candCache = new Map();
+function candidates(veh, k){
+  const D = state.data.detections; if (!D || !state.focus) return [];
+  const M = METHODS[state.focus], d = state.data[veh], tms = d._tms[k], tol = D.tol_ms || 60;
+  const ego = veh === 'vehicle1' ? 'V1' : 'V2', part = ego === 'V1' ? 'V2' : 'V1';
+  const srcs = M.scen === 'V2X' ? [['INFRA', D.infra], ['V1', D.V1[MOD]], ['V2', D.V2[MOD]]]
+             : M.scen === 'V2I' ? [['INFRA', D.infra], [ego, D[ego][MOD]]] : [[part, D[part][MOD]], [ego, D[ego][MOD]]];
+  const idx = srcs.map(([_, src]) => src ? nearestIdx(src.t, tms, tol) : -1);
+  const key = `${veh}|${state.focus}|${idx.join(',')}`;
+  if (_candCache.has(key)) return _candCache.get(key);
+  const items = [];
+  srcs.forEach(([s, src], j) => { if (idx[j] >= 0) src.b[idx[j]].forEach(b => items.push({ s, x:b[0], y:b[1], L:b[2], W:b[3], yaw:b[4], cls:b[5] })); });
+  const par = items.map((_, i) => i), f = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  for (let i = 0; i < items.length; i++) for (let j = i+1; j < items.length; j++)
+    if (items[i].s !== items[j].s && iouBev(items[i], items[j]) >= 0.10) par[f(i)] = f(j);
+  const cl = new Map(); items.forEach((it, i) => { const r = f(i); if (!cl.has(r)) cl.set(r, []); cl.get(r).push(it); });
+  const out = [];
+  for (const c of cl.values()) {
+    const S = new Set(c.map(b => b.s)); if (S.size < 2 || !S.has(ego)) continue;
+    let w = 0, x = 0, y = 0, L = 0, W = 0; c.forEach(b => { const q = b.s === 'INFRA' ? .85 : 1; w += q; x += q*b.x; y += q*b.y; L += q*b.L; W += q*b.W; });
+    out.push({ x:x/w, y:y/w, L:L/w, W:W/w, mask:['INFRA','V1','V2'].reduce((m, s, i) => m | (S.has(s) ? 1 << i : 0), 0) });
+  }
+  if (_candCache.size > 4000) _candCache.clear();
+  _candCache.set(key, out); return out;
+}
+function drawCandidates(ctx, T, veh, k, used){
+  const usedPts = [...used.values()].map(L => L[0].run);
+  candidates(veh, k).forEach(c => {
+    if (usedPts.some(r => Math.hypot(r[2]-c.x, r[3]-c.y) < 2.0)) return;
+    const X = T.x(c.x), Y = T.y(c.y), rad = 7 + Math.max(c.L, c.W)*T.s*.5;
+    ctx.save(); ctx.strokeStyle = 'rgba(203,213,225,.7)'; ctx.lineWidth = 1.1; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.arc(X, Y, rad, 0, 2*Math.PI); ctx.stroke(); ctx.restore();
+    if (T.s > 3) { ctx.font = '9px JetBrains Mono'; ctx.fillStyle = 'rgba(203,213,225,.8)'; ctx.textAlign = 'left'; ctx.fillText(srcTxt(c.mask), X + rad + 3, Y - rad*.5); }
+  });
+}
+const srcTxt = m => ['INFRA','V1','V2'].filter((s, i) => m & (1 << i)).join('+');
+
+function drawVehicle(ctx, T, veh){
+  const d = state.data[veh], k = Math.min(state.frame, d.temps_s.length-1);
+  if (state.show.gnss) {
+    const lo = state.show.trail ? Math.max(0, k-300) : 0;
+    for (let i = lo; i <= k; i++) {
+      ctx.fillStyle = d.masque_infra[i] ? 'rgba(74,158,255,.28)' : 'rgba(245,158,11,.22)';
+      ctx.fillRect(T.x(d.gps_x[i])-1, T.y(d.gps_y[i])-1, 2, 2);
+    }
+  }
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(248,250,252,.28)'; ctx.lineWidth = 1.5; path(ctx, T, d.pos_x_gt, d.pos_y_gt, range(0, k));
+  ctx.strokeStyle = CSS('--gt'); ctx.lineWidth = 2; ctx.shadowColor = '#fff'; ctx.shadowBlur = 4;
+  path(ctx, T, d.pos_x_gt, d.pos_y_gt, range(Math.min(d.i_deb, k), Math.min(k, d.i_fin))); ctx.shadowBlur = 0;
+
+  const cnt = drawLandmarks(ctx, T, veh, k);
+
+  const ids = [...state.on].filter(id => d._tr[id]).sort((a, b) => (a === state.focus) - (b === state.focus));
+  const rings = new Map();
+  ids.forEach(id => {
+    const M = METHODS[id], tr = d._tr[id], idx = spanIdx(d, M, k);
+    if (!idx.length) return;
+    ctx.strokeStyle = M.color; ctx.lineWidth = M.w + (id === state.focus ? .6 : 0); ctx.setLineDash(M.dash);
+    ctx.shadowColor = M.color; ctx.shadowBlur = id === state.focus ? 8 : 4;
+    path(ctx, T, tr.xs, tr.ys, idx); ctx.setLineDash([]); ctx.shadowBlur = 0;
+    const li = idx[idx.length-1];
+    if (tr.xs[li] != null) {
+      ctx.save(); ctx.fillStyle = M.color; ctx.shadowColor = M.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(T.x(tr.xs[li]), T.y(tr.ys[li]), id === state.focus ? 5 : 3.8, 0, 7); ctx.fill();
+      ctx.shadowBlur = 0; ctx.strokeStyle = '#04070a'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
+    }
+    if (M.kind === 'coop' && state.show.rings && id === state.focus && tr.lmIdx && tr.lmIdx[k] >= 0) {
+      const run = tr.lm[tr.lmIdx[k]], key = `${run[2]}|${run[3]}`;
+      if (!rings.has(key)) rings.set(key, []);
+      rings.get(key).push({ id, run, ex: tr.xs[k], ey: tr.ys[k] });
+    }
+  });
+  if (state.show.rings) drawCandidates(ctx, T, veh, k, rings);
+  drawUsedLandmarks(ctx, T, d, k, rings);
+
+  const X = T.x(d.pos_x_gt[k]), Y = T.y(d.pos_y_gt[k]), sc = Math.max(1, Math.min(2.4, T.s/4));
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(-d.cap_gt[k]); ctx.scale(sc, sc);
+  ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#04070a'; ctx.lineWidth = 1.2; ctx.shadowColor = '#fff'; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, 5.5); ctx.lineTo(-3.5, 0); ctx.lineTo(-6, -5.5); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
+  ctx.restore();
+  return cnt;
+}
+function renderVehicle(veh, i){
+  const c = $(`canvas-v${i}`), ctx = c.getContext('2d'), T = tf(c, veh);
+  ctx.clearRect(0, 0, T.w, T.h); ctx.fillStyle = '#04070a'; ctx.fillRect(0, 0, T.w, T.h);
+  drawGrid(ctx, T); drawMap(ctx, T); drawInfra(ctx, T);
+  const cnt = drawVehicle(ctx, T, veh);
+  const d = state.data[veh], k = Math.min(state.frame, d.temps_s.length-1);
+  $(`spd-v${i}`).textContent = `${d.vv_gt[k].toFixed(2)} m/s`;
+  let code = d.masque_infra[k] ? 'z' : 'o';
+  const tr = state.focus && d._tr[state.focus];
+  if (tr && tr.mode) code = tr.mode[k];
+  const sm = SUBMODE[code] || SUBMODE.z;
+  const el = $(`mode-v${i}`); el.style.color = sm.c; el.style.borderColor = sm.c + '66';
+  el.querySelector('.t').textContent = (tr ? 'Active mode · ' : '') + sm.t;
+  $(`ph-v${i}`).innerHTML = `<span style="color:${sm.c}">●</span> ${code === 'o' ? 'Individual' : code === 'z' ? 'Coop. zone — GNSS' : 'Cooperative'}`;
+  $(`cnt-v${i}`).innerHTML = state.data.detections && state.show.landmarks
+    ? CLASS_NAME.map((n, j) => `<span><i style="background:${CLASS_COL[j]}"></i>${cnt[j]} ${n}${cnt[j] > 1 ? 's' : ''}</span>`).join('') : '';
+}
+function render(){
+  if (!state.data) return;
+  renderVehicle('vehicle1', 1); renderVehicle('vehicle2', 2);
+  updateTelemetry(); updateRank(); updateInspector();
+}
+
+/* RIGHT PANEL */
+function updateTelemetry(){
+  const d = state.data.vehicle1, N = d.temps_s.length, k = Math.min(state.frame, N-1);
+  $('frame-display').textContent = `${state.frame} / ${N-1}`;
+  $('time-display').textContent = ` · ${d.temps_s[k].toFixed(2)} s`;
+  $('t-cur').textContent = d.temps_s[k].toFixed(2);
+  const p = state.frame/(N-1)*100; $('slider-prog').style.width = p + '%'; $('slider-thumb').style.left = p + '%';
+}
+const RK_H = 30;
+const rankIds = d => Object.keys(METHODS).filter(id => d._tr[id]);
+function buildRank(){
+  const box = $('rank'); box.innerHTML = '';
+  const d = state.data[state.rankVeh], ids = rankIds(d);
+  box.style.height = (ids.length*RK_H) + 'px';
+  ids.forEach(id => {
+    const M = METHODS[id], el = document.createElement('div'); el.className = 'rk'; el.id = 'rk-' + id; el.style.setProperty('--c', M.color);
+    el.innerHTML = `<span class="pos"></span><span class="nm">${M.kind === 'coop' ? `LiDAR only · <b style="color:${M.color}">${M.scen}</b>` : M.name}<span class="bar"></span></span><span class="val">—</span>`;
+    box.appendChild(el);
+  });
+  updateRank();
+}
+document.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => {
+  state.rankVeh = b.dataset.rv; document.querySelectorAll('[data-rv]').forEach(x => x.classList.toggle('on', x === b)); buildRank();
+});
+function cumRmse(d, id, k){ const c = d._cum[id]; if (!c) return null; const n = c.C[k]; return n >= 2 ? Math.sqrt(c.S[k]/n) : null; }
+function updateRank(){
+  const d = state.data[state.rankVeh], k = Math.min(state.frame, d.temps_s.length-1);
+  const vals = rankIds(d).map(id => [id, cumRmse(d, id, k)]);
+  vals.sort((a, b) => (a[1] ?? 1e9) - (b[1] ?? 1e9));
+  const mx = Math.max(...vals.map(v => v[1] ?? 0), 1e-6);
+  vals.forEach(([id, v], i) => {
+    const el = $('rk-' + id); if (!el) return;
+    el.style.transform = `translateY(${i*RK_H}px)`; el.classList.toggle('first', i === 0 && v != null); el.classList.toggle('sel', id === state.focus);
+    el.querySelector('.pos').textContent = String(i+1).padStart(2, '0');
+    el.querySelector('.val').textContent = v == null ? '—' : v.toFixed(3) + ' m';
+    el.querySelector('.bar').style.width = v == null ? '0%' : (v/mx*100) + '%';
+  });
+}
+function updateInspector(){
+  const box = $('insp');
+  if (!state.focus) { box.innerHTML = '<div class="hint">No cooperative result in this file.</div>'; $('insp-name').textContent = '—'; return; }
+  const M = METHODS[state.focus]; $('insp-name').innerHTML = `<span style="color:${M.color}">${M.name}</span>`;
+  box.innerHTML = ['vehicle1','vehicle2'].map((v, i) => {
+    const d = state.data[v], k = Math.min(state.frame, d.temps_s.length-1), tr = d._tr[state.focus];
+    if (!tr) return `<div class="insp"><div class="insp-h"><b>VEHICLE ${i+1}</b><span>n/a</span></div></div>`;
+    const code = tr.mode ? tr.mode[k] : 'o', sm = SUBMODE[code] || SUBMODE.z, run = tr.lmIdx && tr.lmIdx[k] >= 0 ? tr.lm[tr.lmIdx[k]] : null;
+    const r = cumRmse(d, state.focus, k), ex = tr.xs[k] - d.pos_x_gt[k], ey = tr.ys[k] - d.pos_y_gt[k];
+    let body = `<div class="kv"><span class="k">Instant error</span><span class="v">${Math.hypot(ex, ey).toFixed(3)} m</span>
+      <span class="k">Cumulative RMSE</span><span class="v" style="color:${M.color}">${fmt(r)} m</span>`;
+    if (run) {
+      const dist = Math.hypot(run[2] - d.pos_x_gt[k], run[3] - d.pos_y_gt[k]);
+      body += `<span class="k">Landmark</span><span class="v"><span style="color:${CLASS_COL[run[7]]}">■</span> ${CLASS_NAME[run[7]]} · ${dist.toFixed(1)} m</span>
+        <span class="k">Sources</span><span class="v"><span class="srcs">${['INFRA','V1','V2'].map((s, j) => `<em class="${run[8] & (1<<j) ? 'on' : ''}">${s}</em>`).join('')}</span></span>
+        <span class="k">Boxes fused (WBF)</span><span class="v">${run[12]}</span>
+        <span class="k">σ<sub>x</sub> · σ<sub>y</sub></span><span class="v">${fmt(run[9])} · ${fmt(run[10])} m</span>
+        <span class="k">σ<sub>ψ</sub></span><span class="v">${fmt(run[11]*180/Math.PI, 2)}°</span>`;
+    } else body += `<span class="k">Landmark</span><span class="v" style="color:var(--text-muted)">none — ${code === 'o' ? 'outside zone' : 'GNSS fallback'}</span>`;
+    body += '</div>';
+    return `<div class="insp" style="--c:${M.color}"><div class="insp-h"><b>VEHICLE ${i+1}</b><span style="color:${sm.c};border:1px solid ${sm.c}55">${sm.t.split(' · ')[0]}</span></div>${body}</div>`;
+  }).join('');
+}
+
+/* PLAYBACK */
+function togglePlay(force){
+  state.playing = force === undefined ? !state.playing : force;
+  $('play-ico').innerHTML = state.playing ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+  state.lastT = performance.now(); state.acc = 0;
+}
+function loop(now){
+  if (state.data) {
+    state.dash = (state.dash + .6) % 1000;
+    if (state.playing) {
+      state.acc += (now - state.lastT) * state.speed; state.lastT = now;
+      const steps = Math.floor(state.acc / state.baseMs);
+      if (steps > 0) {
+        state.acc -= steps*state.baseMs;
+        const tot = state.data.vehicle1.temps_s.length - 1;
+        state.frame = Math.min(tot, state.frame + steps); if (state.frame >= tot) togglePlay(false);
+      }
+      render();
+    } else if (state.show.links && $('app').classList.contains('visible')) { renderVehicle('vehicle1', 1); renderVehicle('vehicle2', 2); }
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+$('btn-play').onclick = () => { if (state.frame >= state.data.vehicle1.temps_s.length-1) state.frame = 0; togglePlay(); };
+$('btn-reset').onclick = () => { state.frame = 0; render(); };
+$('btn-step').onclick = () => { togglePlay(false); state.frame = Math.min(state.frame + 10, state.data.vehicle1.temps_s.length-1); render(); };
+document.querySelectorAll('#speed button').forEach(b => b.onclick = () => {
+  state.speed = +b.dataset.s; document.querySelectorAll('#speed button').forEach(x => x.classList.toggle('on', x === b));
+});
+(function slider(){
+  const s = $('slider'); let drag = false;
+  const seek = e => { const r = s.getBoundingClientRect(), p = Math.min(1, Math.max(0, (e.clientX - r.left)/r.width));
+    state.frame = Math.round(p*(state.data.vehicle1.temps_s.length-1)); render(); };
+  s.addEventListener('pointerdown', e => { drag = true; s.setPointerCapture(e.pointerId); seek(e); });
+  s.addEventListener('pointermove', e => drag && seek(e));
+  s.addEventListener('pointerup', () => drag = false);
+})();
+addEventListener('keydown', e => {
+  if (!state.data || !$('app').classList.contains('visible') || e.target.tagName === 'SELECT') return;
+  const N = state.data.vehicle1.temps_s.length - 1;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  else if (e.code === 'ArrowRight') { state.frame = Math.min(N, state.frame + (e.shiftKey ? 100 : 10)); render(); }
+  else if (e.code === 'ArrowLeft')  { state.frame = Math.max(0, state.frame - (e.shiftKey ? 100 : 10)); render(); }
+  else if (e.key === 'f' || e.key === 'F') { document.querySelectorAll('[data-z="follow"]').forEach(b => b.click()); }
+});
+$('btn-shot').onclick = () => {
+  const a = $('canvas-v1'), b = $('canvas-v2'), pad = 40;
+  const out = document.createElement('canvas'); out.width = a.width + b.width; out.height = Math.max(a.height, b.height) + pad;
+  const ctx = out.getContext('2d'); ctx.fillStyle = '#04070a'; ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(a, 0, pad); ctx.drawImage(b, a.width, pad);
+  ctx.fillStyle = '#e8eef5'; ctx.font = `${Math.round(14*(devicePixelRatio||1))}px JetBrains Mono`;
+  ctx.fillText(`${state.data.sequence} · ${$('h-gnss').textContent} GNSS · ${$('h-bbox').textContent} BBox · t=${$('t-cur').textContent}s`, 14, 26);
+  out.toBlob(bl => { const u = URL.createObjectURL(bl), l = document.createElement('a'); l.href = u; l.download = `${state.data.sequence}_f${state.frame}.png`; l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); });
+};
+
+loadManifest();
+</script>
+</body>
+</html>
